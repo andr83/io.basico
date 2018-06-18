@@ -1,0 +1,11 @@
+*.log
+
+# sbt specific
+.cache
+.lib/
+dist/*
+target/
+project/plugins/project/
+
+# Scala-IDE specific
+.idea
