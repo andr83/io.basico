@@ -10,8 +10,8 @@ object JdbcUtil {
     value match {
       case objArr: Array[A] @unchecked => objArr
       case _ =>
-        val arrlength = java.lang.reflect.Array.getLength(value)
-        (0 until arrlength).map(i => java.lang.reflect.Array.get(value, i).asInstanceOf[A]).toArray
+        val arrLength = java.lang.reflect.Array.getLength(value)
+        (0 until arrLength).map(i => java.lang.reflect.Array.get(value, i).asInstanceOf[A]).toArray
     }
   }
 }

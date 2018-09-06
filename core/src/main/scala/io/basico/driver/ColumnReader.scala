@@ -6,6 +6,5 @@ package io.basico.driver
   * @author Andrei Tupitcyn
   */
 trait ColumnReader[A, D <: DriverConf] {
-  def read(rs: D#ResultSet, index: Int): A
-  def read(rs: D#ResultSet, name: String): A
+  def build(rs: D#ResultSet, colIndex: Int): () => A
 }

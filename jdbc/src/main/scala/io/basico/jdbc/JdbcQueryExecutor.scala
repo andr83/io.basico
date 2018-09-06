@@ -3,7 +3,7 @@ package io.basico.jdbc
 import java.sql.{Connection, PreparedStatement, ResultSet}
 
 import io.basico.driver.Query.{ReturnGeneratedKeys, ReturnKind, Returning}
-import io.basico.driver.QueryExecutor
+import io.basico.driver.{QueryExecutor, RowReader}
 import io.basico.util.resource.withResource
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
 
@@ -14,16 +14,16 @@ import scala.util.Try
   */
 class JdbcQueryExecutor(val connection: Connection) extends QueryExecutor[JdbcDriver] {
 
-  override def execute(query: JdbcQuery): Publisher[JdbcRow] = {
-    new Publisher[JdbcRow] {
-      override def subscribe(s: Subscriber[_ >: JdbcRow]): Unit = {
+  override def execute[A](query: JdbcQuery, rowReader: RowReader[A, JdbcDriver]): Publisher[A] = {
+    new Publisher[A] {
+      override def subscribe(s: Subscriber[_ >: A]): Unit = {
         s.onSubscribe(new RowSubscription(s))
       }
 
-      class RowSubscription(s: Subscriber[_ >: JdbcRow]) extends Subscription {
+      class RowSubscription(s: Subscriber[_ >: A]) extends Subscription {
 
         var count = 0
-        lazy val (statement: PreparedStatement, rs: ResultSet, row: JdbcRow) = {
+        lazy val (statement: PreparedStatement, rs: ResultSet, nextRow: (() => A)) = {
           val stm = connection.prepareStatement(query.sql)
           var rs: ResultSet = null
           Try {
@@ -32,10 +32,13 @@ class JdbcQueryExecutor(val connection: Connection) extends QueryExecutor[JdbcDr
             rs = stm.getResultSet
           } recover {
             case e =>
+              if (rs != null) {
+                Try(rs.close())
+              }
               stm.close()
               throw e
           }
-          (stm, rs, JdbcRow(rs))
+          (stm, rs, rowReader.build(rs))
         }
 
         override def cancel(): Unit = {
@@ -49,7 +52,7 @@ class JdbcQueryExecutor(val connection: Connection) extends QueryExecutor[JdbcDr
             Try {
               var i = 0
               while (i < n && rs.next()) {
-                s.onNext(row)
+                s.onNext(nextRow())
                 i += 1
               }
 
@@ -75,7 +78,6 @@ class JdbcQueryExecutor(val connection: Connection) extends QueryExecutor[JdbcDr
           close()
         }
       }
-
     }
   }
 
@@ -95,15 +97,13 @@ class JdbcQueryExecutor(val connection: Connection) extends QueryExecutor[JdbcDr
     } { stm =>
       query.holder.binder(query.holder.value).bind(stm, 1)
       stm.execute()
-
       val rs = returnKind match {
         case ReturnGeneratedKeys => stm.getGeneratedKeys
         case Returning           => stm.getResultSet
       }
 
       rs.next()
-      val row = JdbcRow(rs)
-      rowReader.read(row)
+      rowReader.build(rs)()
     }
   }
 }

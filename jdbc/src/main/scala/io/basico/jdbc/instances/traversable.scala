@@ -29,25 +29,28 @@ trait JdbcTraversableInstances {
   implicit def jdbcSeqBinder[A: ClassTag](implicit meta: TypeMeta[A]): ValueBinder[Seq[A], JdbcDriver] =
     sqlArrayFromTraversableValueBinder[A, Seq[A]]
 
-  implicit def jdbcArrayColumnReader[A : ClassTag]: JdbcColumnReader[Array[A]] =
+  implicit def jdbcArrayColumnReader[A: ClassTag]: JdbcColumnReader[Array[A]] =
     JdbcColumnReader((rs, idx) => {
-      JdbcUtil.getArray[A](rs.getArray(idx).getArray)
+      JdbcUtil.getArray[A](rs.getArray(idx + 1).getArray)
     })((rs, name) => {
       JdbcUtil.getArray[A](rs.getArray(name).getArray)
     })
 
-  implicit def jdbcCBFColumnReader[C[_], A : ClassTag](implicit cbf: CanBuildFrom[C[A], A, C[A]]): ColumnReader[C[A], JdbcDriver] =
+  implicit def jdbcCBFColumnReader[C[_], A: ClassTag](
+    implicit cbf: CanBuildFrom[C[A], A, C[A]]
+  ): ColumnReader[C[A], JdbcDriver] = {
     JdbcColumnReader((rs, idx) => {
-      val arr = jdbcArrayColumnReader[A].read(rs, idx)
+      val arr = jdbcArrayColumnReader[A].build(rs, idx)()
       val cb = cbf.apply()
       arr.foreach(cb.+=)
       cb.result()
     })((rs, name) => {
-      val arr = jdbcArrayColumnReader[A].read(rs, name)
+      val arr = jdbcArrayColumnReader[A].build(rs, 0)()
       val cb = cbf.apply()
       arr.foreach(cb.+=)
       cb.result()
     })
+  }
 }
 
 object traversable extends JdbcTraversableInstances

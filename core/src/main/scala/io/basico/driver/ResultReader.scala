@@ -7,27 +7,31 @@ import scala.collection.generic.CanBuildFrom
 /**
   * @author Andrei Tupitcyn
   */
-trait ResultReader[A, D <: DriverConf] {
-  def read(publisher: Publisher[Row[D]]): A
+trait ResultReader[Result, D <: DriverConf] {
+  type Row
+  def rowReader: RowReader[Row, D]
+  def read(publisher: Publisher[Row]): Result
 }
 
 object ResultReader {
   implicit def optionalResultReader[A, D <: DriverConf](
-    implicit rowReader: RowReader[A, D]
+    implicit _rowReader: RowReader[A, D]
   ): ResultReader[Option[A], D] =
     new ResultReader[Option[A], D] {
-      override def read(publisher: Publisher[Row[D]]): Option[A] = {
+      override type Row = A
+      override def rowReader: RowReader[A, D] = _rowReader
+      override def read(publisher: Publisher[A]): Option[A] = {
         var res: Option[A] = None
 
-        val subscriber: Subscriber[Row[D]] = new Subscriber[Row[D]] {
+        val subscriber: Subscriber[A] = new Subscriber[A] {
           private var sub: Subscription = _
 
           override def onError(t: Throwable): Unit = throw t
 
           override def onComplete(): Unit = {}
 
-          override def onNext(t: Row[D]): Unit = {
-            res = Some(rowReader.read(t))
+          override def onNext(a: A): Unit = {
+            res = Some(a)
             sub.cancel()
           }
 
@@ -41,28 +45,31 @@ object ResultReader {
       }
     }
 
-  implicit def singleResultReader[A, D <: DriverConf](
-    implicit optReader: ResultReader[Option[A], D]
-  ): ResultReader[A, D] =
+  implicit def singleResultReader[A, D <: DriverConf](implicit optReader: ResultReader[Option[A], D],
+                                                      _rowReader: RowReader[A, D]): ResultReader[A, D] =
     new ResultReader[A, D] {
-      override def read(publisher: Publisher[Row[D]]): A =
-        optReader.read(publisher).get
+      override type Row = A
+      override def rowReader: RowReader[A, D] = _rowReader
+      override def read(publisher: Publisher[A]): A =
+        optReader.read(publisher.asInstanceOf[Publisher[optReader.Row]]).get
     }
 
-  implicit def seqResultReader[A, C[_], D <: DriverConf](implicit rowReader: RowReader[A, D],
+  implicit def seqResultReader[A, C[_], D <: DriverConf](implicit _rowReader: RowReader[A, D],
                                                          cbf: CanBuildFrom[Nothing, A, C[A]]): ResultReader[C[A], D] =
     new ResultReader[C[A], D] {
-      override def read(publisher: Publisher[Row[D]]): C[A] = {
+      override type Row = A
+      override def rowReader: RowReader[A, D] = _rowReader
+      override def read(publisher: Publisher[A]): C[A] = {
         val res = cbf()
 
-        val subscriber: Subscriber[Row[D]] = new Subscriber[Row[D]] {
+        val subscriber: Subscriber[A] = new Subscriber[A] {
 
           override def onError(t: Throwable): Unit = throw t
 
           override def onComplete(): Unit = {}
 
-          override def onNext(t: Row[D]): Unit = {
-            res += rowReader.read(t)
+          override def onNext(a: A): Unit = {
+            res += a
           }
 
           override def onSubscribe(s: Subscription): Unit = {

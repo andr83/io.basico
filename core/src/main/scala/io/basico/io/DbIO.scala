@@ -35,7 +35,7 @@ object DbIO {
 
   case class QueryIO[A, D <: DriverConf](query: Query[D], resultReader: ResultReader[A, D]) extends DbIO[A, D] {
     def unsafeRunSync(implicit queryExecutor: QueryExecutor[D]): A = {
-      val p = queryExecutor.execute(query)
+      val p = queryExecutor.execute(query, resultReader.rowReader)
       resultReader.read(p)
     }
   }

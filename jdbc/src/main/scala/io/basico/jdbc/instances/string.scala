@@ -18,7 +18,7 @@ trait JdbcStringInstances {
     })
 
   implicit val jdbcStringColumnReader: JdbcColumnReader[String] =
-    JdbcColumnReader((rs, idx) => rs.getString(idx))((rs, name) => rs.getString(name))
+    JdbcColumnReader((rs, idx) => rs.getString(idx + 1))((rs, name) => rs.getString(name))
 }
 
 object string extends JdbcStringInstances

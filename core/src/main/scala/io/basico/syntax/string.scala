@@ -1,7 +1,7 @@
 package io.basico.syntax
 
 import io.basico.driver
-import io.basico.driver.{DriverConf, Query, QueryExecutor, ValueBinder}
+import io.basico.driver.{DriverConf, Query, ValueBinder}
 import io.basico.macros.TupleMacros
 
 import scala.language.experimental.macros

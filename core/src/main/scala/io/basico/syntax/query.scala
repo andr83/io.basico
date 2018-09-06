@@ -1,6 +1,6 @@
 package io.basico.syntax
 
-import io.basico.driver.{DriverConf, Query, ResultReader, ValueBinder}
+import io.basico.driver._
 import io.basico.io.DbIO.{QueryIO, UpdateIO}
 import io.basico.macros.TupleMacros
 
@@ -12,6 +12,7 @@ import scala.languageFeature.experimental.macros
   */
 class QueryOps[D <: DriverConf](query: Query[D]) {
   def as[A](implicit resultReader: ResultReader[A, D]): QueryIO[A, D] = QueryIO(query, resultReader)
+
   def update: UpdateIO[D] = UpdateIO(query)
 
   object bind {
